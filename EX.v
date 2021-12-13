@@ -4,9 +4,9 @@ module EX(
     input wire rst,
     // input wire flush,
     input wire [`StallBus-1:0] stall,
-    
+
     input wire [`ID_TO_EX_WD-1:0] id_to_ex_bus,
-    
+
     output wire [`EX_TO_MEM_WD-1:0] ex_to_mem_bus,
     output wire [37:0] ex_to_id,
     output wire rec_type,
@@ -27,7 +27,7 @@ module EX(
         // end
         else if (stall[2]==`Stop && stall[3]==`NoStop) begin
             id_to_ex_bus_r <= `ID_TO_EX_WD'b0;
-        end//000111
+        end
         else if (stall[2]==`NoStop) begin
             id_to_ex_bus_r <= id_to_ex_bus;
         end
@@ -106,10 +106,11 @@ module EX(
 
     assign  data_sram_en = data_ram_en;
     assign  data_sram_wen = data_ram_wen;
-    assign  data_sram_addr = ex_result;
+    assign  data_sram_addr =  ex_result;
     assign  data_sram_wdata = rf_rdata2 ;
 
-    assign rec_type = ( inst[31:26] == 6'b10_0011 ) ? 1'b1 : 1'b0 ;
+    assign rec_type = ( inst[31:26] == 6'b100011 ) ? 1'b1:1'b0;
+
 
 
 

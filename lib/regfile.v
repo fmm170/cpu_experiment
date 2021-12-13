@@ -54,6 +54,7 @@ module regfile(
     ((raddr1 == ex_rf_waddr)&& ex_rf_we) ? ex_result : 
     ((raddr1 == mem_rf_waddr)&& mem_rf_we) ? mem_rf_wdata : 
     ((raddr1 == wb1_rf_waddr)&& wb1_rf_we) ? wb1_rf_wdata :
+//    (raddr1 ==5'b01100)?  32'b0 :
     reg_array[raddr1];
     
 

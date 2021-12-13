@@ -2,7 +2,7 @@
 module CTRL(
     input wire rst,
     // input wire stallreq_for_ex,
-    input wire stallreq_for_load,
+     input wire stallreq_for_load,
 
     // output reg flush,
     // output reg [31:0] new_pc,

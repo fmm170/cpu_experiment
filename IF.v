@@ -45,7 +45,8 @@ module IF(
             ce_reg <= 1'b1;
         end
     end
-
+   
+    
 
     assign next_pc = br_e ? br_addr 
                    : pc_reg + 32'h4;
