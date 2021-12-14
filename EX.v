@@ -13,7 +13,11 @@ module EX(
     output wire data_sram_en,
     output wire [3:0] data_sram_wen,
     output wire [31:0] data_sram_addr,
-    output wire [31:0] data_sram_wdata
+    output wire [31:0] data_sram_wdata,
+    output wire stallreq_for_ex,
+    input wire [31:0] hi_data,
+    input wire [31:0] lo_data,
+    output wire [64:0] ex_to_mem_hilo
 );
 
     reg [`ID_TO_EX_WD-1:0] id_to_ex_bus_r;
@@ -45,6 +49,13 @@ module EX(
     wire [31:0] rf_rdata1, rf_rdata2;
     reg is_in_delayslot;
 
+    wire [31:0] lo_rdata;
+    wire [31:0] hi_rdata;
+    wire ex_we_hilo;
+    wire [31:0] store_hilo;
+    
+    
+    
     assign {
         ex_pc,          // 148:117
         inst,           // 116:85
@@ -81,8 +92,11 @@ module EX(
         .alu_src2    (alu_src2    ),
         .alu_result  (alu_result  )
     );
-      
-    assign ex_result = alu_result;
+    
+   assign store_hilo = inst_mflo ? lo_data : 
+                       inst_mfhi ? hi_data : 32'b0;
+                       
+   assign ex_result = (inst_mflo|inst_mfhi) ? store_hilo :alu_result;
 
     assign ex_to_id = {
         rf_we,
@@ -119,14 +133,22 @@ module EX(
     // MUL part
     wire [63:0] mul_result;
     wire mul_signed; // 有符号乘法标�??
-
+    wire inst_mult, inst_multu;
+    wire [31:0] mul_src1;
+    wire [31:0] mul_src2;
+    
+    assign mul_signed = inst_mult ? 1'b1 : 1'b0 ;//mult 1 multu0
+    assign mul_src1 = (inst_mult | inst_multu) ? alu_src1 :32'b0;
+    assign mul_src2 = (inst_mult | inst_multu) ? alu_src2 :32'b0;
+    
+    
     mul u_mul(
     	.clk        (clk            ),
         .resetn     (~rst           ),
         .mul_signed (mul_signed     ),
-        .ina        (      ), // 乘法源操作数1
-        .inb        (      ), // 乘法源操作数2
-        .result     (mul_result     ) // 乘法结果 64bit
+        .ina        (mul_src1      ), // 
+        .inb        (mul_src2      ), // 
+        .result     (mul_result     ) // 
     );
 
     // DIV part
@@ -140,6 +162,8 @@ module EX(
     reg [31:0] div_opdata2_o;
     reg div_start_o;
     reg signed_div_o;
+    
+    
 
     div u_div(
     	.rst          (rst          ),
@@ -168,6 +192,7 @@ module EX(
             div_start_o = `DivStop;
             signed_div_o = 1'b0;
             case ({inst_div,inst_divu})
+            
                 2'b10:begin
                     if (div_ready_i == `DivResultNotReady) begin
                         div_opdata1_o = rf_rdata1;
@@ -219,8 +244,34 @@ module EX(
             endcase
         end
     end
+    
+    
+    assign inst_divu  = ( inst[31:26] == 6'b00_0000 && inst[15:6] === 10'b00_0000_0000 && inst[5:0] === 6'b01_1011 ) ? 1'b1 : 1'b0 ;
+    assign inst_div   = ( inst[31:26] == 6'b00_0000 && inst[15:6] === 10'b00_0000_0000 && inst[5:0] === 6'b01_1010 ) ? 1'b1 : 1'b0 ;
+    assign inst_mult  = ( inst[31:26] == 6'b00_0000 && inst[15:6] === 10'b00_0000_0000 && inst[5:0] === 6'b01_1000 ) ? 1'b1 : 1'b0 ;
+    assign inst_multu = ( inst[31:26] == 6'b00_0000 && inst[15:6] === 10'b00_0000_0000 && inst[5:0] === 6'b01_1001 ) ? 1'b1 : 1'b0 ;
+    assign inst_mflo  = ( inst[31:26] == 6'b00_0000 && inst[25:16] === 10'b00_0000_0000  &&  inst[10:6] == 5'b00_000  &&  inst[5:0] === 6'b01_0010 ) ? 1'b1 : 1'b0  ;
+    assign inst_mfhi  = ( inst[31:26] == 6'b00_0000 && inst[25:16] === 10'b00_0000_0000  &&  inst[10:6] == 5'b00_000  &&  inst[5:0] === 6'b01_0000 ) ? 1'b1 : 1'b0  ;
+    assign inst_mtlo  = ( inst[31:26] == 6'b00_0000 && inst[20:6] == 15'b00_0000_0000_0000_0 && inst[5:0] === 6'b01_0011 ) ? 1'b1 : 1'b0  ;
+    assign inst_mthi  = ( inst[31:26] == 6'b00_0000 && inst[20:6] == 15'b00_0000_0000_0000_0 && inst[5:0] === 6'b01_0001 ) ? 1'b1 : 1'b0  ;
+    
+    
 
-    // mul_result �?? div_result 可以直接使用
+    assign stallreq_for_ex = (div_ready_i==1'b0 & div_start_o==1'b1) ? 1'b1 :1'b0;
+    
+    assign lo_rdata = ( inst_mult | inst_multu ) ? mul_result[31:0] : 
+                      ( inst_div | inst_divu ) ? div_result[31:0]  :
+                      inst_mthi ? lo_data :
+                      inst_mtlo ? rf_rdata1 : lo_data ;
+    assign hi_rdata = ( inst_mult | inst_multu ) ? mul_result[63:32] :
+                      ( inst_div | inst_divu ) ? div_result[63:32] :
+                      inst_mthi ? rf_rdata1 :
+                      inst_mtlo ? hi_data : hi_data;
+    assign ex_we_hilo = ( inst_mult | inst_multu | inst_div | inst_divu | inst_mthi | inst_mtlo ) ? 1'b1 :1'b1; 
+                       
+    
+    assign ex_to_mem_hilo = { ex_we_hilo, hi_rdata, lo_rdata } ; 
+    
     
     
 endmodule

@@ -8,26 +8,47 @@ module MEM(
     input wire [`EX_TO_MEM_WD-1:0] ex_to_mem_bus,
     input wire [31:0] data_sram_rdata,
     output wire [37:0] mem_to_id,
-    output wire [`MEM_TO_WB_WD-1:0] mem_to_wb_bus
+    output wire [`MEM_TO_WB_WD-1:0] mem_to_wb_bus, 
+    input wire [64:0] ex_to_mem_hilo, 
+    output wire [64:0] mem_to_wb_hilo,
+    output wire [64:0] mem_to_id_hilo
 );
 
     reg [`EX_TO_MEM_WD-1:0] ex_to_mem_bus_r;
-
+    reg [64:0] mem_to_wb_hilo_r;
+    
+    wire [31:0] mem_lo_rdata;
+    wire [31:0] mem_hi_rdata;
+    wire mem_we_hilo;
+    
+    assign {
+        mem_we_hilo , 
+        mem_hi_rdata , 
+        mem_lo_rdata
+    }=  ex_to_mem_hilo;
+    
+    
     always @ (posedge clk) begin
         if (rst) begin
             ex_to_mem_bus_r <= `EX_TO_MEM_WD'b0;
+            mem_to_wb_hilo_r <= 65'b0;
         end
         // else if (flush) begin
         //     ex_to_mem_bus_r <= `EX_TO_MEM_WD'b0;
         // end
         else if (stall[3]==`Stop && stall[4]==`NoStop) begin
             ex_to_mem_bus_r <= `EX_TO_MEM_WD'b0;
+            mem_to_wb_hilo_r <= 65'b0;
         end
         else if (stall[3]==`NoStop) begin
             ex_to_mem_bus_r <= ex_to_mem_bus;
+            mem_to_wb_hilo_r <= ex_to_mem_hilo ;
         end
     end
 
+   assign mem_to_wb_hilo= mem_to_wb_hilo_r;
+   assign mem_to_id_hilo= mem_to_wb_hilo_r;
+   
     wire [31:0] mem_pc;
     wire data_ram_en;
     wire [3:0] data_ram_wen;

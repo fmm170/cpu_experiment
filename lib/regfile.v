@@ -14,7 +14,22 @@ module regfile(
     input wire [4:0] waddr,
     input wire [31:0] wdata
 );
+    
+    
+    
+    wire [31:0] ex_result;
+    wire ex_rf_we;
+    wire [4:0] ex_rf_waddr;
     reg [31:0] reg_array [31:0];
+    wire [31:0] mem_rf_wdata;
+    wire mem_rf_we;
+    wire [4:0] mem_rf_waddr;
+    wire [31:0] wb1_rf_wdata;
+    wire wb1_rf_we;
+    wire [4:0] wb1_rf_waddr;
+    
+    
+    
     // write
     always @ (posedge clk) begin
         if (we && waddr!=5'b0) begin
@@ -22,27 +37,21 @@ module regfile(
         end
     end
 
-    wire [31:0] ex_result;
-    wire ex_rf_we;
-    wire [4:0] ex_rf_waddr;
+    
     assign {
         ex_rf_we,          // 37
         ex_rf_waddr,       // 36:32
         ex_result       // 31:0
     } = ex_to_id;
 //       mem_to_id
-    wire [31:0] mem_rf_wdata;
-    wire mem_rf_we;
-    wire [4:0] mem_rf_waddr;
+    
     assign {
         mem_rf_we,      // 37
         mem_rf_waddr,   // 36:32
         mem_rf_wdata    // 31:0
     } = mem_to_id;
 //        wb_to_id
-    wire [31:0] wb1_rf_wdata;
-    wire wb1_rf_we;
-    wire [4:0] wb1_rf_waddr;
+    
     assign {
         wb1_rf_we,      // 37
         wb1_rf_waddr,   // 36:32
