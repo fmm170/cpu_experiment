@@ -53,10 +53,11 @@ module EX(
     wire [31:0] hi_rdata;
     wire ex_we_hilo;
     wire [31:0] store_hilo;
-    
+    wire [3:0] data_ram_ren;
     
     
     assign {
+        data_ram_ren , //162:159
         ex_pc,          // 148:117
         inst,           // 116:85
         alu_op,         // 84:83
@@ -108,6 +109,7 @@ module EX(
     
     
     assign ex_to_mem_bus = {
+        data_ram_ren, //79:76
         ex_pc,          // 75:44
         data_ram_en,    // 43
         data_ram_wen,   // 42:39
@@ -118,15 +120,25 @@ module EX(
     };
 
 
-    assign  data_sram_en = data_ram_en;
-    assign  data_sram_wen = data_ram_wen;
-    assign  data_sram_addr =  ex_result;
-    assign  data_sram_wdata = rf_rdata2 ;
+    assign data_sram_en = data_ram_en;
+    assign data_sram_wen =   (data_ram_ren==4'b0101 && ex_result[1:0] == 2'b00 )? 4'b0001 
+                            :(data_ram_ren==4'b0101 && ex_result[1:0] == 2'b01 )? 4'b0010
+                            :(data_ram_ren==4'b0101 && ex_result[1:0] == 2'b10 )? 4'b0100
+                            :(data_ram_ren==4'b0101 && ex_result[1:0] == 2'b11 )? 4'b1000
+                            :(data_ram_ren==4'b0111 && ex_result[1:0] == 2'b00 )? 4'b0011
+                            :(data_ram_ren==4'b0111 && ex_result[1:0] == 2'b10 )? 4'b1100
+                            : data_ram_wen;    
+    assign data_sram_addr = ex_result; 
+    assign data_sram_wdata = data_sram_wen==4'b1111 ? rf_rdata2 
+                            :data_sram_wen==4'b0001 ? {24'b0,rf_rdata2[7:0]}
+                            :data_sram_wen==4'b0010 ? {16'b0,rf_rdata2[7:0],8'b0}
+                            :data_sram_wen==4'b0100 ? {8'b0,rf_rdata2[7:0],16'b0}
+                            :data_sram_wen==4'b1000 ? {rf_rdata2[7:0],24'b0}
+                            :data_sram_wen==4'b0011 ? {16'b0,rf_rdata2[15:0]}
+                            :data_sram_wen==4'b1100 ? {rf_rdata2[15:0],16'b0}
+                            :32'b0;
 
     assign rec_type = ( inst[31:26] == 6'b100011 ) ? 1'b1:1'b0;
-
-
-
 
 
 
