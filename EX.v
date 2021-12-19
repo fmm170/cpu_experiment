@@ -1,4 +1,5 @@
 `include "lib/defines.vh"
+
 module EX(
     input wire clk,
     input wire rst,
@@ -142,33 +143,118 @@ module EX(
 
 
 
-    // MUL part
-    wire [63:0] mul_result;
-    wire mul_signed; // ÊúâÁ¨¶Âè∑‰πòÊ≥ïÊ†áÔø??
-    wire inst_mult, inst_multu;
-    wire [31:0] mul_src1;
-    wire [31:0] mul_src2;
+//    // MUL part
+//    wire [63:0] mul_result;
+//    wire mul_signed; // ÊúâÁ¨¶Âè∑‰πòÊ≥ïÊ†áÔø??
+//    wire inst_mult, inst_multu;
+//    wire [31:0] mul_src1;
+//    wire [31:0] mul_src2;
     
-    assign mul_signed = inst_mult ? 1'b1 : 1'b0 ;//mult 1 multu0
-    assign mul_src1 = (inst_mult | inst_multu) ? alu_src1 :32'b0;
-    assign mul_src2 = (inst_mult | inst_multu) ? alu_src2 :32'b0;
+//    assign mul_signed = inst_mult ? 1'b1 : 1'b0 ;//mult 1 multu0
+//    assign mul_src1 = (inst_mult | inst_multu) ? alu_src1 :32'b0;
+//    assign mul_src2 = (inst_mult | inst_multu) ? alu_src2 :32'b0;
     
     
-    mul u_mul(
-    	.clk        (clk            ),
-        .resetn     (~rst           ),
-        .mul_signed (mul_signed     ),
-        .ina        (mul_src1      ), // 
-        .inb        (mul_src2      ), // 
-        .result     (mul_result     ) // 
-    );
+//    mul u_mul(
+//    	.clk        (clk            ),
+//        .resetn     (~rst           ),
+//        .mul_signed (mul_signed     ),
+//        .ina        (mul_src1      ), // 
+//        .inb        (mul_src2      ), // 
+//        .result     (mul_result     ) // 
+//    );
 
+// MUL part
+   wire [63:0] mul_result;
+   reg stallreq_for_mul;
+    wire mul_ready_i;
+    reg signed_mul_o; // «∑Ò «”–∑˚∫≈≥À∑®
+    reg [31:0] mul_opdata1_o;
+    reg [31:0] mul_opdata2_o;
+    reg mul_start_o;
+    mymul my_mul(
+        .rst            (rst           ),
+	    .clk            (clk            ),
+	    .signed_mul_i   (signed_mul_o     ),
+	    .mult1_o            (mul_opdata1_o      ),
+	    .mult2_o            (mul_opdata2_o      ),
+	    .start_i        (mul_start_o      ),
+	    .result_o       (mul_result     ),
+	    .ready_o        (mul_ready_i     )
+    );
+    always @ (*) begin
+        if (rst) begin
+            stallreq_for_mul = `NoStop;
+            mul_opdata1_o = `ZeroWord;
+            mul_opdata2_o = `ZeroWord;
+            mul_start_o = `MulStop;
+            signed_mul_o = 1'b0;
+        end
+        else begin
+            stallreq_for_mul = `NoStop;
+            mul_opdata1_o = `ZeroWord;
+            mul_opdata2_o = `ZeroWord;
+            mul_start_o = `MulStop;
+            signed_mul_o = 1'b0;
+            case ({inst_mult,inst_multu})
+                2'b10:begin
+                    if (mul_ready_i == `MulResultNotReady) begin
+                        mul_opdata1_o = rf_rdata1;
+                        mul_opdata2_o = rf_rdata2;
+                        mul_start_o = `MulStart;
+                        signed_mul_o = 1'b1;
+                        stallreq_for_mul = `Stop;
+                    end
+                    else if (mul_ready_i == `MulResultReady) begin
+                        mul_opdata1_o = rf_rdata1;
+                        mul_opdata2_o = rf_rdata2;
+                        mul_start_o = `MulStop;
+                        signed_mul_o = 1'b1;
+                        stallreq_for_mul = `NoStop;
+                    end
+                    else begin
+                        mul_opdata1_o = `ZeroWord;
+                        mul_opdata2_o = `ZeroWord;
+                        mul_start_o = `MulStop;
+                        signed_mul_o = 1'b0;
+                        stallreq_for_mul = `NoStop;
+                    end
+                end
+                2'b01:begin
+                    if (mul_ready_i == `MulResultNotReady) begin
+                        mul_opdata1_o = rf_rdata1;
+                        mul_opdata2_o = rf_rdata2;
+                        mul_start_o = `MulStart;
+                        signed_mul_o = 1'b0;
+                        stallreq_for_mul = `Stop;
+                    end
+                    else if (mul_ready_i == `MulResultReady) begin
+                        mul_opdata1_o = rf_rdata1;
+                        mul_opdata2_o = rf_rdata2;
+                        mul_start_o = `MulStop;
+                        signed_mul_o = 1'b0;
+                        stallreq_for_mul = `NoStop;
+                    end
+                    else begin
+                        mul_opdata1_o = `ZeroWord;
+                        mul_opdata2_o = `ZeroWord;
+                        mul_start_o = `MulStop;
+                        signed_mul_o = 1'b0;
+                        stallreq_for_mul = `NoStop;
+                    end
+                end
+                default:begin
+                end
+            endcase
+        end
+    end
+    
     // DIV part
     wire [63:0] div_result;
     wire inst_div, inst_divu;
     wire div_ready_i;
     reg stallreq_for_div;
-    assign stallreq_for_ex = stallreq_for_div;
+    
 
     reg [31:0] div_opdata1_o;
     reg [31:0] div_opdata2_o;
@@ -269,12 +355,13 @@ module EX(
     
     
 
-    assign stallreq_for_ex = (div_ready_i==1'b0 & div_start_o==1'b1) ? 1'b1 :1'b0;
+    assign stallreq_for_ex = (( div_ready_i==1'b0 & div_start_o==1'b1 )||( mul_ready_i==1'b0 & mul_start_o==1'b1 ))? 1'b1 :1'b0;
     
     assign lo_rdata = ( inst_mult | inst_multu ) ? mul_result[31:0] : 
                       ( inst_div | inst_divu ) ? div_result[31:0]  :
                       inst_mthi ? lo_data :
                       inst_mtlo ? rf_rdata1 : lo_data ;
+                      
     assign hi_rdata = ( inst_mult | inst_multu ) ? mul_result[63:32] :
                       ( inst_div | inst_divu ) ? div_result[63:32] :
                       inst_mthi ? rf_rdata1 :
@@ -284,6 +371,6 @@ module EX(
     
     assign ex_to_mem_hilo = { ex_we_hilo, hi_rdata, lo_rdata } ; 
     
-    
+
     
 endmodule

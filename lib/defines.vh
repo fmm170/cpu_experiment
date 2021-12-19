@@ -25,3 +25,12 @@
 `define DivStart 1'b1
 `define DivStop 1'b0
 // 2021-11-29 add
+
+//³Ë·¨mymul
+`define MulFree 2'b00
+`define MulResultNotReady 1'b0
+`define MulOn 2'b10
+`define MulEnd 2'b11
+`define MulResultReady 1'b1
+`define MulStop 1'b0
+`define MulStart 1'b1
